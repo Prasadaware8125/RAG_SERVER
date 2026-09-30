@@ -13,6 +13,12 @@ from utils.document_loader import extract_text_from_file
 from utils.auth import hash_password, verify_password, create_jwt_token, decode_jwt_token
 
 
+try:
+    from flask_cors import CORS
+    _CORS_AVAILABLE = True
+except ImportError:
+    _CORS_AVAILABLE = False
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("sourceiq_flask_app")
@@ -27,20 +33,23 @@ app = Flask(__name__, template_folder=os.path.join(BASE_DIR, "templates"), stati
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024  # 32MB max upload
 
+if _CORS_AVAILABLE:
+    CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+
 @app.before_request
 def handle_preflight():
     if request.method == "OPTIONS":
         response = jsonify({"status": "ok"})
         response.headers['Access-Control-Allow-Origin'] = '*'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = '*'
         return response, 200
 
 @app.after_request
 def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = '*'
     return response
 
 
