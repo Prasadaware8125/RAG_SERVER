@@ -8,7 +8,6 @@ import logging
 from flask import Flask, request, jsonify, render_template
 from werkzeug.utils import secure_filename
 
-from phase10.web_grounded_rag import WebGroundedRAGPipeline
 from config.config import validate_config
 from utils.document_loader import extract_text_from_file
 from utils.auth import hash_password, verify_password, create_jwt_token, decode_jwt_token
@@ -42,6 +41,7 @@ def get_pipeline():
     global _pipeline_instance
     if _pipeline_instance is None:
         try:
+            from phase10.web_grounded_rag import WebGroundedRAGPipeline
             validate_config()
             _pipeline_instance = WebGroundedRAGPipeline()
             if "--clear-cache" in sys.argv:
@@ -52,6 +52,7 @@ def get_pipeline():
             logger.error(f"Failed to initialize RAG Pipeline: {e}")
             _pipeline_instance = None
     return _pipeline_instance
+
 
 
 @atexit.register
