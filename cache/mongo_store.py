@@ -14,6 +14,13 @@ from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 
 try:
+    import certifi
+    _CERTIFI_AVAILABLE = True
+except ImportError:
+    _CERTIFI_AVAILABLE = False
+    certifi = None
+
+try:
     import pymongo
     from pymongo import MongoClient, ASCENDING, DESCENDING
     _PYMONGO_AVAILABLE = True
@@ -73,17 +80,23 @@ class MongoStore:
             return
 
         try:
+            mongo_kwargs = {
+                "serverSelectionTimeoutMS": 10000,
+                "connectTimeoutMS": 10000,
+                "maxPoolSize": 20
+            }
+            if _CERTIFI_AVAILABLE and certifi:
+                mongo_kwargs["tlsCAFile"] = certifi.where()
+
             self._client = MongoClient(
                 self.uri,
-                serverSelectionTimeoutMS=2000,
-                connectTimeoutMS=2000,
-                maxPoolSize=20
+                **mongo_kwargs
             )
             # Test connection
             self._client.admin.command("ping")
             self._db = self._client[self.db_name]
             self._available = True
-            logger.info(f"MongoDB connected successfully to '{self.db_name}' at {self.uri}")
+            logger.info(f"MongoDB connected successfully to '{self.db_name}'")
             self._init_indexes()
         except Exception as e:
             logger.warning(f"MongoDB connection failed ({e}). Running with local SQLite database store.")

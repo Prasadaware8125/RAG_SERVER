@@ -16,6 +16,9 @@ flask>=3.0.0
 redis>=5.0.0
 numpy>=1.24.0
 pymongo>=4.6.0
+dnspython>=2.4.0
+certifi>=2023.11.17
 bcrypt>=4.1.0
 pyjwt>=2.8.0
 gunicorn>=21.2.0
+
