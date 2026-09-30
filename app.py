@@ -87,8 +87,20 @@ def get_pipeline():
             logger.info("WebGroundedRAGPipeline successfully initialized.")
         except Exception as e:
             logger.error(f"Failed to initialize RAG Pipeline: {e}")
-            _pipeline_instance = None
     return _pipeline_instance
+
+import threading
+
+def _bg_prewarm():
+    time.sleep(1)
+    try:
+        logger.info("Starting background pre-warming of RAG Pipeline...")
+        get_pipeline()
+    except Exception as e:
+        logger.warning(f"Background pre-warm status: {e}")
+
+threading.Thread(target=_bg_prewarm, daemon=True).start()
+
 
 
 
