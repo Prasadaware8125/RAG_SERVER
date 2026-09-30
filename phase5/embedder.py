@@ -57,6 +57,8 @@ class ChunkEmbedder:
         else:
             print_loading(f"Initializing local SentenceTransformer ('{self.model_name}') model...")
             try:
+                import torch
+                torch.set_num_threads(1)
                 from sentence_transformers import SentenceTransformer
                 self.local_model = SentenceTransformer(self.model_name)
                 _LOCAL_MODEL_CACHE[self.model_name] = self.local_model
