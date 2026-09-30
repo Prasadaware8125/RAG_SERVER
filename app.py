@@ -5,6 +5,7 @@ import uuid
 import atexit
 import sys
 import logging
+import threading
 from flask import Flask, request, jsonify, render_template
 from werkzeug.utils import secure_filename
 
@@ -91,6 +92,16 @@ def get_pipeline():
         except Exception as e:
             logger.error(f"Failed to initialize RAG Pipeline: {e}")
     return _pipeline_instance
+
+def _prewarm_pipeline():
+    logger.info("Starting background pre-warming of RAG Pipeline...")
+    try:
+        get_pipeline()
+    except Exception as e:
+        logger.error(f"Background pre-warming failed: {e}")
+
+threading.Thread(target=_prewarm_pipeline, daemon=True).start()
+
 
 
 @atexit.register
