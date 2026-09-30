@@ -35,27 +35,34 @@ def add_cors_headers(response):
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
     return response
 
-# Global RAG pipeline instance
-try:
-    validate_config()
-    pipeline = WebGroundedRAGPipeline()
-    if "--clear-cache" in sys.argv:
-        pipeline.cache_manager.clear_all_cache()
-        logger.info("Persistent RAG cache cleared at startup.")
-    logger.info("WebGroundedRAGPipeline successfully initialized.")
-except Exception as e:
-    logger.error(f"Failed to initialize RAG Pipeline: {e}")
-    pipeline = None
+# Global RAG pipeline instance (Lazy loading for fast startup & low memory)
+_pipeline_instance = None
+
+def get_pipeline():
+    global _pipeline_instance
+    if _pipeline_instance is None:
+        try:
+            validate_config()
+            _pipeline_instance = WebGroundedRAGPipeline()
+            if "--clear-cache" in sys.argv:
+                _pipeline_instance.cache_manager.clear_all_cache()
+                logger.info("Persistent RAG cache cleared at startup.")
+            logger.info("WebGroundedRAGPipeline successfully initialized.")
+        except Exception as e:
+            logger.error(f"Failed to initialize RAG Pipeline: {e}")
+            _pipeline_instance = None
+    return _pipeline_instance
 
 
 @atexit.register
 def close_pipeline_cache():
     """Close the application-scoped cache connections during process shutdown."""
-    if pipeline:
+    if _pipeline_instance:
         try:
-            pipeline.cache_manager.close()
+            _pipeline_instance.cache_manager.close()
         except Exception as e:
             logger.warning(f"Failed to close cache manager: {e}")
+
 
 # Storage for uploaded files in session
 uploaded_documents = {}  # file_id -> { filename, text, chunk_count }
@@ -111,6 +118,7 @@ def index():
 
 @app.route("/api/auth/register", methods=["POST"])
 def auth_register():
+    pipeline = get_pipeline()
     if not pipeline:
         return jsonify({"success": False, "error": "System uninitialized"}), 500
     data = request.get_json() or {}
@@ -147,6 +155,7 @@ def auth_register():
 
 @app.route("/api/auth/login", methods=["POST"])
 def auth_login():
+    pipeline = get_pipeline()
     if not pipeline:
         return jsonify({"success": False, "error": "System uninitialized"}), 500
     data = request.get_json() or {}
@@ -185,6 +194,7 @@ def auth_me():
 
 @app.route("/api/history", methods=["GET"])
 def get_history():
+    pipeline = get_pipeline()
     if not pipeline:
         return jsonify({"success": False, "error": "System uninitialized"}), 500
     user_info = get_current_user_info()
@@ -194,6 +204,7 @@ def get_history():
 
 @app.route("/api/history/<history_id>", methods=["GET", "DELETE"])
 def history_item_detail(history_id):
+    pipeline = get_pipeline()
     if not pipeline:
         return jsonify({"success": False, "error": "System uninitialized"}), 500
     user_info = get_current_user_info()
@@ -246,6 +257,7 @@ def upload_file():
 
 @app.route("/api/chat", methods=["POST"])
 def chat():
+    pipeline = get_pipeline()
     if not pipeline:
         return jsonify({"success": False, "error": "RAG Pipeline not initialized. Check configuration and Groq API key."}), 500
         
@@ -371,6 +383,7 @@ def chat_detail(chat_id):
 
 @app.route("/api/clear", methods=["POST"])
 def clear():
+    pipeline = get_pipeline()
     if not pipeline:
         return jsonify({"success": False, "error": "Pipeline not initialized"}), 500
     try:
