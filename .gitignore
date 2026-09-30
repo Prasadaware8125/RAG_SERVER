@@ -1,0 +1,10 @@
+.env
+.venv/
+**/__pycache__/
+**/*.pyc
+logs/
+.chroma_temp/
+uploads/
+cache/*.db
+cache/sessions.json
+.DS_Store
