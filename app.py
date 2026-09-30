@@ -44,16 +44,34 @@ def add_cors_headers(response):
     return response
 
 
-# Global RAG pipeline instance (Lazy loading for fast startup & low memory)
+# Global RAG pipeline & CacheManager instances (Lazy loading for fast startup & low memory)
 _pipeline_instance = None
+_cache_manager_instance = None
+
+def get_cache_manager():
+    """Initializes and returns lightweight CacheManager for fast auth & user history without heavy ML models."""
+    global _cache_manager_instance, _pipeline_instance
+    if _cache_manager_instance is None:
+        if _pipeline_instance and hasattr(_pipeline_instance, 'cache_manager'):
+            _cache_manager_instance = _pipeline_instance.cache_manager
+        else:
+            try:
+                from cache.cache_manager import CacheManager
+                _cache_manager_instance = CacheManager()
+                logger.info("Standalone CacheManager initialized for Auth/DB operations.")
+            except Exception as e:
+                logger.error(f"Failed to initialize CacheManager: {e}")
+                _cache_manager_instance = None
+    return _cache_manager_instance
 
 def get_pipeline():
-    global _pipeline_instance
+    global _pipeline_instance, _cache_manager_instance
     if _pipeline_instance is None:
         try:
             from phase10.web_grounded_rag import WebGroundedRAGPipeline
             validate_config()
             _pipeline_instance = WebGroundedRAGPipeline()
+            _cache_manager_instance = _pipeline_instance.cache_manager
             if "--clear-cache" in sys.argv:
                 _pipeline_instance.cache_manager.clear_all_cache()
                 logger.info("Persistent RAG cache cleared at startup.")
@@ -68,7 +86,12 @@ def get_pipeline():
 @atexit.register
 def close_pipeline_cache():
     """Close the application-scoped cache connections during process shutdown."""
-    if _pipeline_instance:
+    if _cache_manager_instance:
+        try:
+            _cache_manager_instance.close()
+        except Exception as e:
+            logger.warning(f"Failed to close cache manager: {e}")
+    elif _pipeline_instance:
         try:
             _pipeline_instance.cache_manager.close()
         except Exception as e:
@@ -129,9 +152,9 @@ def index():
 
 @app.route("/api/auth/register", methods=["POST"])
 def auth_register():
-    pipeline = get_pipeline()
-    if not pipeline:
-        return jsonify({"success": False, "error": "System uninitialized"}), 500
+    cache_mgr = get_cache_manager()
+    if not cache_mgr:
+        return jsonify({"success": False, "error": "Database service uninitialized"}), 500
     data = request.get_json() or {}
     username = data.get("username", "").strip()
     email = data.get("email", "").strip()
@@ -140,7 +163,7 @@ def auth_register():
     if not username or not email or not password:
         return jsonify({"success": False, "error": "Username, email, and password are required."}), 400
 
-    mongo = pipeline.cache_manager.mongo
+    mongo = cache_mgr.mongo
     if not mongo.available:
         return jsonify({"success": False, "error": "Database service unavailable. Please try again later."}), 503
 
@@ -166,9 +189,9 @@ def auth_register():
 
 @app.route("/api/auth/login", methods=["POST"])
 def auth_login():
-    pipeline = get_pipeline()
-    if not pipeline:
-        return jsonify({"success": False, "error": "System uninitialized"}), 500
+    cache_mgr = get_cache_manager()
+    if not cache_mgr:
+        return jsonify({"success": False, "error": "Database service uninitialized"}), 500
     data = request.get_json() or {}
     identifier = data.get("email", "").strip() or data.get("username", "").strip()
     password = data.get("password", "").strip()
@@ -176,7 +199,7 @@ def auth_login():
     if not identifier or not password:
         return jsonify({"success": False, "error": "Email/username and password are required."}), 400
 
-    mongo = pipeline.cache_manager.mongo
+    mongo = cache_mgr.mongo
     if not mongo.available:
         return jsonify({"success": False, "error": "Database service unavailable. Please try again later."}), 503
 
@@ -205,29 +228,29 @@ def auth_me():
 
 @app.route("/api/history", methods=["GET"])
 def get_history():
-    pipeline = get_pipeline()
-    if not pipeline:
-        return jsonify({"success": False, "error": "System uninitialized"}), 500
+    cache_mgr = get_cache_manager()
+    if not cache_mgr:
+        return jsonify({"success": False, "error": "Database service uninitialized"}), 500
     user_info = get_current_user_info()
     user_id = user_info["user_id"] if user_info else "anonymous"
-    history = pipeline.cache_manager.mongo.get_user_history(user_id)
+    history = cache_mgr.mongo.get_user_history(user_id)
     return jsonify({"success": True, "history": history})
 
 @app.route("/api/history/<history_id>", methods=["GET", "DELETE"])
 def history_item_detail(history_id):
-    pipeline = get_pipeline()
-    if not pipeline:
-        return jsonify({"success": False, "error": "System uninitialized"}), 500
+    cache_mgr = get_cache_manager()
+    if not cache_mgr:
+        return jsonify({"success": False, "error": "Database service uninitialized"}), 500
     user_info = get_current_user_info()
     if not user_info:
         return jsonify({"success": False, "error": "Unauthorized"}), 401
     user_id = user_info["user_id"]
 
     if request.method == "DELETE":
-        deleted = pipeline.cache_manager.mongo.delete_user_history_item(user_id, history_id)
+        deleted = cache_mgr.mongo.delete_user_history_item(user_id, history_id)
         return jsonify({"success": deleted})
     else:
-        item = pipeline.cache_manager.mongo.get_user_history_item(user_id, history_id)
+        item = cache_mgr.mongo.get_user_history_item(user_id, history_id)
         if item:
             return jsonify({"success": True, "history_item": item})
         return jsonify({"success": False, "error": "History item not found"}), 404

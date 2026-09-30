@@ -1,6 +1,6 @@
 import unittest
 import json
-from app import app, pipeline
+from app import app, get_cache_manager
 from utils.auth import create_jwt_token
 
 class TestAuthUIIntegration(unittest.TestCase):
@@ -17,13 +17,14 @@ class TestAuthUIIntegration(unittest.TestCase):
         self.test_user_b_email = "beta@example.com"
         self.test_user_b_password = "password456"
 
+        cache_mgr = get_cache_manager()
         # Clean up existing test users in Mongo or SQLite fallback
-        if pipeline and pipeline.cache_manager and pipeline.cache_manager.mongo:
-            mongo = pipeline.cache_manager.mongo
-            if mongo._available and mongo._db is not None:
+        if cache_mgr and cache_mgr.mongo:
+            mongo = cache_mgr.mongo
+            if getattr(mongo, '_available', False) and mongo._db is not None:
                 mongo._db.users.delete_many({"email": {"$in": [self.test_user_a_email, self.test_user_b_email]}})
                 mongo._db.query_history.delete_many({"user_id": {"$in": [self.test_user_a_id, self.test_user_b_id]}})
-            if mongo.fallback_store:
+            if getattr(mongo, 'fallback_store', None):
                 try:
                     with mongo.fallback_store._get_conn() as conn:
                         conn.execute("DELETE FROM users WHERE email IN (?, ?)", (self.test_user_a_email, self.test_user_b_email))
@@ -32,7 +33,8 @@ class TestAuthUIIntegration(unittest.TestCase):
                     pass
 
     def test_register_login_and_me_flow(self):
-        if not (pipeline and pipeline.cache_manager and pipeline.cache_manager.mongo.available):
+        cache_mgr = get_cache_manager()
+        if not (cache_mgr and cache_mgr.mongo.available):
             self.skipTest("MongoDB service unavailable")
         # 1. Register User A
         reg_payload = {
@@ -90,11 +92,12 @@ class TestAuthUIIntegration(unittest.TestCase):
         self.assertEqual(res_me_unauth.status_code, 401)
 
     def test_user_isolated_history(self):
-        if not (pipeline and pipeline.cache_manager and pipeline.cache_manager.mongo.available):
+        cache_mgr = get_cache_manager()
+        if not (cache_mgr and cache_mgr.mongo.available):
             self.skipTest("MongoDB not connected")
 
         # Save history item for User A
-        pipeline.cache_manager.mongo.save_query_history(
+        cache_mgr.mongo.save_query_history(
             user_id=self.test_user_a_id,
             query_hash="hash_alpha_12345",
             original_query="What is Python?",
@@ -110,7 +113,7 @@ class TestAuthUIIntegration(unittest.TestCase):
         h1_id = f"hist_{self.test_user_a_id}_hash_alpha_12345"
 
         # Save history item for User B
-        pipeline.cache_manager.mongo.save_query_history(
+        cache_mgr.mongo.save_query_history(
             user_id=self.test_user_b_id,
             query_hash="hash_beta_67890",
             original_query="What is MongoDB?",
