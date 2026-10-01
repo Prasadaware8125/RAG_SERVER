@@ -81,8 +81,8 @@ class MongoStore:
 
         try:
             mongo_kwargs = {
-                "serverSelectionTimeoutMS": 10000,
-                "connectTimeoutMS": 10000,
+                "serverSelectionTimeoutMS": 2000,
+                "connectTimeoutMS": 2000,
                 "maxPoolSize": 20
             }
             if _CERTIFI_AVAILABLE and certifi:

@@ -90,7 +90,7 @@ def get_pipeline():
                 logger.info("Persistent RAG cache cleared at startup.")
             logger.info("WebGroundedRAGPipeline successfully initialized.")
         except Exception as e:
-            logger.error(f"Failed to initialize RAG Pipeline: {e}")
+            logger.exception("Failed to initialize RAG Pipeline")
     return _pipeline_instance
 
 def _prewarm_pipeline():

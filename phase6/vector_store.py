@@ -8,6 +8,7 @@ Dependencies: chromadb, utils.logger, utils.helper
 
 import sys
 from typing import List, Dict, Any, Optional
+from utils.logger import setup_logger
 try:
     import chromadb
     from chromadb.api.models.Collection import Collection
