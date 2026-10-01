@@ -519,7 +519,7 @@ class WebGroundedRAGPipeline:
             return result
 
         except Exception as e:
-            logger.error(f"Pipeline failed at run: {e}")
+            logger.exception("Pipeline failed at run")
             print_failure(f"Pipeline crashed: {e}")
             total_duration = time.perf_counter() - total_start
             timings["TOTAL RESPONSE TIME"] = total_duration

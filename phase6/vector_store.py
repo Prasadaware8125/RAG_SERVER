@@ -9,6 +9,15 @@ Dependencies: chromadb, utils.logger, utils.helper
 import sys
 from typing import List, Dict, Any, Optional
 from utils.logger import setup_logger
+from utils.helper import (
+    print_phase_header,
+    print_loading,
+    print_processing,
+    print_success,
+    print_failure,
+    print_statistics,
+    PhaseTimer
+)
 try:
     import chromadb
     from chromadb.api.models.Collection import Collection
